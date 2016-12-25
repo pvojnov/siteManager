@@ -23,7 +23,7 @@ class Server(models.Model):
     envirnment  = models.CharField(max_length=25, null=False, blank=False, choices=ENVIRONMENT)
     name        = models.CharField(max_length=100, null=True, blank=True)
     os          = models.CharField(max_length=25, null=False, blank=False, choices=(('LIN', 'Linux'), ('WIN', 'Windows')))
-    ip          = models.IPAddressField(null=False, blank=False)
+    ip          = models.GenericIPAddressField(null=False, blank=False)
     hostname    = models.CharField(max_length=100, null=True, blank=True)
     ram         = models.CharField(max_length=255, null=True, blank=True)
     cpu         = models.CharField(max_length=255, null=True, blank=True)

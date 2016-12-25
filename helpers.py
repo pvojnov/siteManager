@@ -1,3 +1,6 @@
+# create the project
+django-admin startproject siteManager
+
 # create app
 python manage.py startapp servers
 
@@ -5,12 +8,24 @@ python manage.py startapp servers
 # run server
 python manage.py runserver
 
+# migrate
+python manage.py makemigrations servers
+
+# print sql comands for migration
+python manage.py sqlmigrate servers 0001
+	# django 1.6
+	python manage.py sqlall servers
+# migrate changes to DB
 python manage.py migrate
+	# django 1.6
+	python manage.py syncdb
+
+# check migrations	
+python manage.py showmigrations
 
 
-
-python manage.py sqlall servers
-python manage.py syncdb
+# create superuser
+python manage.py createsuperuser
 
 
 
