@@ -29,6 +29,10 @@ python manage.py createsuperuser
 
 
 
+python manage.py collectstatic
+
+
+
 python manage.py dumpdata servers > temp_data.json
 python manage.py sqlclear servers | python manage.py dbshell
 python manage.py syncdb
