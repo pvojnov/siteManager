@@ -2,7 +2,9 @@ from django.db import models
 from django.utils import timezone
 
 
-
+##################################################################
+# SITE
+##################################################################
 class Site(models.Model):
     name        = models.CharField(max_length=100, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
@@ -12,16 +14,38 @@ class Site(models.Model):
         return unicode(':'.join([str(self.id), (self.name or '(None)')]))
 
 
+
+##################################################################
+# SERVER
+##################################################################
 ENVIRONMENT = (
         ('DEV', 'Development'),
         ('TEST', 'Test'),
         ('PROD', 'Production'),
     )
 
+STATUS = (
+        ('STARTED', 'Started'),
+        ('STOPPED', 'Stopped'),
+        ('RESTARTING', 'Restarting'),
+        ('RELOADING', 'Reloading'),
+        ('PENDING', 'Pending'),
+    )
+
+ACTION = (
+        ('START', 'Start'),
+        ('STOP', 'Stop'),
+        ('RESTART', 'Restart'),
+        ('RELOAD', 'Reload'),
+        ('NONE', 'None'),
+    )
+
 class Server(models.Model):
     site        = models.ForeignKey(Site, null=False, blank=False, related_name='servers')
-    envirnment  = models.CharField(max_length=25, null=False, blank=False, choices=ENVIRONMENT)
+    environment = models.CharField(max_length=25, null=False, blank=False, choices=ENVIRONMENT)
     name        = models.CharField(max_length=100, null=True, blank=True)
+    status      = models.CharField(max_length=25, null=False, blank=False, choices=STATUS, default='PENDING')
+    action      = models.CharField(max_length=25, null=False, blank=False, choices=ACTION, default='NONE')
     os          = models.CharField(max_length=25, null=False, blank=False, choices=(('LIN', 'Linux'), ('WIN', 'Windows')))
     ip          = models.GenericIPAddressField(null=False, blank=False)
     hostname    = models.CharField(max_length=100, null=True, blank=True)
@@ -39,7 +63,9 @@ class Server(models.Model):
 
 
 
-
+##################################################################
+# SERVICE
+##################################################################
 class ServiceType(models.Model):
     name        = models.CharField(max_length=100, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
@@ -60,8 +86,10 @@ class ServiceContainer(models.Model):
 
 class Service(models.Model):
     server      = models.ForeignKey(Server, null=False, blank=False)#, related_name='services')
-    envirnment  = models.CharField(max_length=25, null=False, blank=False, choices=ENVIRONMENT)
+    environment  = models.CharField(max_length=25, null=False, blank=False, choices=ENVIRONMENT)
     name        = models.CharField(max_length=100, null=True, blank=True)
+    status      = models.CharField(max_length=25, null=False, blank=False, choices=STATUS, default='PENDING')
+    action      = models.CharField(max_length=25, null=False, blank=False, choices=ACTION, default='NONE')
     description = models.TextField(null=True, blank=True)
     port        = models.IntegerField(null=False, blank=False, default=80)
     type        = models.ForeignKey(ServiceType, null=False, blank=False, related_name='services')
