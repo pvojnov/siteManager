@@ -1,3 +1,4 @@
 .*
 *.pyc
 *.sqlite
+temp_data.json

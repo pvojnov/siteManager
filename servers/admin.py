@@ -1,12 +1,15 @@
+import sys
 from django.contrib import messages, admin
 
 from django.utils.html import format_html
 from django import forms
 from django.http import HttpResponseRedirect
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
+from django.template.response import TemplateResponse
 
-from servers.models import Site, Server, ServiceType, ServiceContainer, Service
+import servers.ansible
+from servers.models import AnsibleLog, Site, Server, ServiceType, ServiceContainer, Service
 
 
 
@@ -18,6 +21,10 @@ class ActionAdmin(admin.ModelAdmin):
     def status_alt(self, obj):
         if obj.status == 'STARTED':
             color = 'green'
+        elif obj.status == 'STARTING':
+            color = 'orange'
+        elif obj.status == 'STOPPING':
+            color = 'red'
         elif obj.status == 'STOPPED':
             color = 'red'
         elif obj.status == 'RESTARTING':
@@ -60,80 +67,112 @@ class ActionAdmin(admin.ModelAdmin):
 
 
 
-    actions = ['start_services', 'stop_services', 'restart_services', 'reload_services']
+    actions = ['start', 'stop', 'restart', 'reload', 'reset']
 
+    # Dev - Temp
+    def reset(self, request, queryset):
+        for service in queryset:
+            service.status = 'PENDING'
+            service.action = 'NONE'
+            service.execution = 'N_A'
+            service.save()
+    #reset.short_description = "reset values for "
+
+    ##################################################################
     # Site Actions
-    def start_services(self, request, queryset):
+    ##################################################################
+    def start(self, request, queryset):
         form = None
-        action = 'start_services'
-        selection_item_title = 'Start site service: '
+        action = sys._getframe().f_code.co_name
+        title = 'Start services'
         object_list_title = 'Following services will be started: '
 
-        print 'starting services'
-
         # remove objects that cannot be changed
+        queryset = queryset.filter(active=True, action='NONE').exclude(execution__in=['PENDING', 'EXECUTING'])
         #queryset = queryset.filter(active=True).exclude(servers__isnull=False, delete_change__status__in=[2, 3])
         #queryset = queryset.filter(active=True).exclude(servers__isnull=False)
         #queryset = queryset.filter(insert_change__status__in=[2])
 
-        return self.select_val_form(request, queryset, form, action, selection_item_title, object_list_title)
-
-    start_services.short_description = "Start services on selected sites"
-
-    def stop_services(self, request, queryset):
-        form = None
-        action = 'stop_services'
-        selection_item_title = 'Stop services: '
-        object_list_title = 'Following services will be stoped: '
-
-        print 'starting services'
-
-        # remove objects that cannot be changed
-        #queryset = queryset.filter(active=True).exclude(servers__isnull=False, delete_change__status__in=[2, 3])
-        #queryset = queryset.filter(insert_change__status__in=[2])
-
         #return self.select_val_form(request, queryset, form, action, selection_item_title, object_list_title)
 
-    stop_services.short_description = "Stop services on selected sites"
+        if queryset.count() > 0:
+            return self.confirm_action(request, queryset, form, action, title, object_list_title)
+        else:
+            messages.warning(request, 'There are no selected %s suitable for %s!' % (self.model._meta.verbose_name_plural.title(), action.title()))
 
-    def restart_services(self, request, queryset):
+
+    start.short_description = "Start services on selected sites"
+
+
+
+    def stop(self, request, queryset):
         form = None
-        action = 'restart_services'
-        selection_item_title = 'Restart services: '
-        object_list_title = 'Following services will be stoped: '
-
-        print 'starting service'
+        action = sys._getframe().f_code.co_name
+        title = '{action} services'.format(action=action.title())
+        object_list_title = 'Following services will be stopped: '
 
         # remove objects that cannot be changed
-        #queryset = queryset.filter(active=True).exclude(servers__isnull=False, delete_change__status__in=[2, 3])
-        #queryset = queryset.filter(insert_change__status__in=[2])
+        queryset = queryset.filter(active=True, action='NONE').exclude(execution__in=['PENDING', 'EXECUTING'])
 
-        #return self.select_val_form(request, queryset, form, action, selection_item_title, object_list_title)
+        if queryset.count() > 0:
+            return self.confirm_action(request, queryset, form, action, title, object_list_title)
+        else:
+            messages.warning(request, 'There are no selected %s suitable for %s!' % (self.model._meta.verbose_name_plural.title(), action.title()))
 
-    restart_services.short_description = "Restart services on selected sites"
+    stop.short_description = "Stop services on selected sites"
 
-    def reload_services(self, request, queryset):
+    def restart(self, request, queryset):
         form = None
-        action = 'reload_site_services'
-        selection_item_title = 'Reload site service: '
+        action = sys._getframe().f_code.co_name
+        title = '{action} services'.format(action=action.title())
+        object_list_title = 'Following services will be restarted: '
+
+        # remove objects that cannot be changed
+        queryset = queryset.filter(active=True, action='NONE').exclude(execution__in=['PENDING', 'EXECUTING'])
+
+        if queryset.count() > 0:
+            return self.confirm_action(request, queryset, form, action, title, object_list_title)
+        else:
+            messages.warning(request, 'There are no selected %s suitable for %s!' % (self.model._meta.verbose_name_plural.title(), action.title()))
+
+    restart.short_description = "Restart services on selected sites"
+
+    def reload(self, request, queryset):
+        form = None
+        action = sys._getframe().f_code.co_name
+        title = '{action} services'.format(action=action.title())
         object_list_title = 'Following services will be reloaded: '
 
-        print 'starting services'
-
         # remove objects that cannot be changed
-        #queryset = queryset.filter(active=True).exclude(servers__isnull=False, delete_change__status__in=[2, 3])
-        #queryset = queryset.filter(insert_change__status__in=[2])
+        queryset = queryset.filter(active=True, action='NONE').exclude(execution__in=['PENDING', 'EXECUTING'])
 
-        #return self.select_val_form(request, queryset, form, action, selection_item_title, object_list_title)
+        if queryset.count() > 0:
+            return self.confirm_action(request, queryset, form, action, title, object_list_title)
+        else:
+            messages.warning(request, 'There are no selected %s suitable for %s!' % (self.model._meta.verbose_name_plural.title(), action.title()))
 
-    reload_services.short_description = "Reload services on selected sites"
+    reload.short_description = "Reload services on selected sites"
 
 
+    ##################################################################
+    # confirmation form
+    ##################################################################
+    class AsignUserForm(forms.Form):
+        _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
 
-    def select_val_form(self, request, queryset, form, action, selection_item_title, object_list_title):
-        if 'apply' in request.POST:
+    def confirm_action(self, request, queryset, form, action, title, object_list_title):
+        if 'confirm' in request.POST:
             form = self.AsignUserForm(request.POST)
             if form.is_valid():
+                # do some action here
+                for object in queryset:
+                    # execute action on object
+                    getattr(object, action)()
+                    object.save()
+
+                # execute ansible comands
+                servers.ansible.execute(queryset)
+                '''
                 change = form.cleaned_data['change']
                 if action == 'copy_for_update':
                     for i in queryset:
@@ -145,20 +184,25 @@ class ActionAdmin(admin.ModelAdmin):
                 elif action == 'set_delete_change':
                     queryset.update(delete_change=change)
                     messages.success(request, 'Change %s applied as delete change to objects %s.' % (change.id, queryset.values_list('sufi',flat=True)[:20]))
+                '''
             return HttpResponseRedirect(request.get_full_path())
         if not form:
+            # adds action name to the form, necessary to return to the calling function after confirmation
             form = self.AsignUserForm(initial={'_selected_action': request.POST.getlist(admin.ACTION_CHECKBOX_NAME)})
-        return render_to_response('admin/select_change.html', {'objects': queryset,
-                                                         'asign_user_form': form,
-                                                         'action': action,
-                                                         'selection_item_title': selection_item_title,
-                                                         'object_list_title': object_list_title,
-                                                        },
-                                  context_instance=RequestContext(request))
 
-    class AsignUserForm(forms.Form):
-        _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
-        change = forms.ModelChoiceField(Change.objects.exclude(status__id__in=[2,3]))
+
+        context = dict(
+            self.admin_site.each_context(request),
+            name=title,
+            object_list_title=object_list_title,
+            action=action,
+            opts=self.model._meta,
+            queryset=queryset,
+            form=form,
+        )
+
+        return render(request, 'admin/form_action_confirmation.html', context)
+
 
 
 
@@ -180,7 +224,7 @@ admin.site.register(Site, SiteAdmin)
 ##################################################################
 class ServerAdmin(ActionAdmin):
     save_on_top = True
-    list_display = ['name', 'site', 'status_alt', 'action_alt', 'environment', 'os', 'ip', 'hostname', 'ram', 'cpu', 'disk', 'description', 'active', ]
+    list_display = ['name', 'site', 'status_alt', 'action_alt', 'execution', 'environment', 'os', 'ip', 'hostname', 'ram', 'cpu', 'disk', 'description', 'active', ]
     search_fields = ['name', 'site__name', 'environment', 'os', 'ip', 'hostname', 'ram', 'cpu', 'disk', 'description', ]
     list_filter = ['site__name', 'environment', 'status', 'action', 'os', 'active', ]
 admin.site.register(Server, ServerAdmin)
@@ -194,7 +238,20 @@ admin.site.register(ServiceContainer)
 ##################################################################
 class ServiceAdmin(ActionAdmin):
     save_on_top = True
-    list_display = ['name', 'server', 'status_alt', 'action_alt', 'port', 'type', 'container', 'environment', 'created_on', 'started_on', 'reloaded_on', 'description', 'active', ]
+    list_display = ['name', 'server', 'status_alt', 'action_alt', 'execution', 'port', 'type', 'container', 'environment', 'created_on', 'started_on', 'reloaded_on', 'description', 'active', ]
     search_fields = ['name', 'server__site__name', 'server__name', 'port', 'type__name', 'container__name', 'environment', 'description', ]
     list_filter = ['server__site', 'server', 'type', 'status', 'action', 'container', 'environment', 'active', ]
 admin.site.register(Service, ServiceAdmin)
+
+
+
+##################################################################
+# ANSIBLE
+##################################################################
+
+class AnslibleLogAdmin(ActionAdmin):
+    save_on_top = True
+    list_display = [ 'service', 'cmd', 'respone', 'error', 'success', 'created_on', ]
+    search_fields = [ 'service__name', 'cmd', 'respone', 'error', 'success', 'created_on', ]
+    list_filter = [ 'service__server__site', 'service__server', 'service', 'success', ]
+admin.site.register(AnsibleLog, AnslibleLogAdmin)
